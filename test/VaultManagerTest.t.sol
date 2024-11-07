@@ -24,10 +24,6 @@ contract VaultManagerTest is Test {
     /// @notice Symb strat 2
     address[] strat2 = [makeAddr("AVS3"), makeAddr("AVS4")];
 
-    /// @notice Symbiotic vaults
-    SymbioticVaultMock symbioticVaultX;
-    SymbioticVaultMock symbioticVaultY;
-
     // Stakers
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
@@ -35,26 +31,13 @@ contract VaultManagerTest is Test {
     /// @notice Initial balance of all the node operators
     uint256 internal constant STARTING_BALANCE = 500 ether;
 
-    /// @notice Simulate a BTC staking dataset fetch from the replayer
-    struct BtcStakingDataset {
-        address babylonVault;
-        bytes btcPubKey;
-        address staker;
-        uint256 satoshiAmount;
-        uint256 depositTimestamp;
-        uint256 duration;
-        address[] avs;
-        uint256[] allocations;
-    }
-    BtcStakingDataset[] btcStakingDataset;
-    
     function setUp() external {
         // deploy the ByzBTC token
         DeployByzBTC deployByzBTC = new DeployByzBTC();
         byzBTC = deployByzBTC.run();
 
         // deploy the vault manager
-        vaultManager = new VaultManager(BYZANTINE_RELAYER_ADDRESS, address(byzBTC));
+        vaultManager = new VaultManager(BYZANTINE_RELAYER_ADDRESS, address(byzBTC), makeAddr("catalogSPV"));
 
         // fund the stakers
         vm.deal(alice, STARTING_BALANCE);
@@ -66,6 +49,27 @@ contract VaultManagerTest is Test {
         address babylonVault = vaultManager.createBabylonStratVault(strat1);
         assertEq(address(BabylonStrategyVault(babylonVault).byzBTC()), address(byzBTC));
     }
+
+    // function test_restakeInBabylonVault() external {
+    //     // Create the Babylon strategy vault
+    //     vm.prank(BYZANTINE_RELAYER_ADDRESS);
+    //     address babylonVault = vaultManager.createBabylonStratVault(strat2);
+
+    //     // Restake in the Babylon strategy vault
+    //     vm.prank(BYZANTINE_RELAYER_ADDRESS);
+    //     vaultManager.restakeInBabylonVault(
+    //         alice,
+    //         80000,
+    //         1725705600,
+    //         31536000,
+    //         strat2
+    //     );
+
+    //     // Check the total staked amount in the Babylon strategy vault
+    //     uint256 totalStaked = BabylonStrategyVault(babylonVault).getTotalStaked();
+    //     assertEq(totalStaked, 80000);
+    //     assertEq(BabylonStrategyVault(babylonVault).symbioticVault().activeStake(), 80000);
+    // }
 
     // function test_restakeInBabylonVault() external {
     //     // Create the Babylon strategy vault

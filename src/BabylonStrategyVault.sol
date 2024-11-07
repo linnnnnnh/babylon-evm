@@ -36,30 +36,6 @@ contract BabylonStrategyVault {
     }
 
     /**
-     * @notice Mint the ByzBTC tokens to the vault
-     * @param to address of the recipient
-     * @param amount amount of the ByzBTC to mint which is 1:1 to the amount of BTC staked
-     */
-    function mintByzBTC(address to, uint256 amount) public onlyVaultManager {
-        byzBTC.mint(to, amount);
-    }
-
-    /**
-     * @notice Register the staking details
-     * @param _staker address of the staker
-     * @param _satoshiAmount amount of the BTC to stake in satoshis
-     * @param _depositTimestamp timestamp of the deposit
-     * @param _duration duration of the BTC staking
-     */
-    function registerStaking(address _staker, uint256 _satoshiAmount, uint256 _depositTimestamp, uint256 _duration, bytes memory _btcPubKey) public onlyVaultManager {
-        // Calculate the timestamp corresponding to timelock
-        uint256 exitTimestamp = _depositTimestamp + _duration;
-
-        // Update the staking details 
-        stakingDetails[_staker] = StakingDetail(_btcPubKey, _satoshiAmount, _depositTimestamp, _duration, exitTimestamp);
-    }
-
-    /**
      * @notice Deposit the ByzBTC tokens to the Symbiotic Vault
      * @param _amount amount of the ByzBTC to deposit
      * @param _staker address of the staker
