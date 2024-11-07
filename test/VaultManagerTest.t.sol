@@ -16,8 +16,8 @@ contract VaultManagerTest is Test {
     VaultManager vaultManager;
     ByzBTC byzBTC;
 
-    /// @notice Owner of the vault manager
-    address constant OWNER = 0xaDDDe88E8C1786ab04D2640FF0F155506E283584;
+    /// @notice Owner of the vault manager which is the Byzantine Relayer
+    address constant BYZANTINE_RELAYER_ADDRESS = 0x39ace511812E43dd318C81552Caf3C8EA4b178F2;
 
     /// @notice Symbiotic vaults
     SymbioticVaultMock symbioticVaultX;
@@ -53,26 +53,24 @@ contract VaultManagerTest is Test {
         symbioticVaultY = new SymbioticVaultMock(address(byzBTC));
 
         // deploy the vault manager
-        vaultManager = new VaultManager(OWNER, address(byzBTC));
+        vaultManager = new VaultManager(BYZANTINE_RELAYER_ADDRESS, address(byzBTC));
 
         // fund the stakers
         vm.deal(alice, STARTING_BALANCE);
         vm.deal(bob, STARTING_BALANCE);
-
-        // // Set the btcStakingDataset when strategy vault creation is not needed
-        // btcStakingDataset.push(BtcStakingDataset({
-        //     babylonVault: address(0),
-        //     btcPubKey: hex"0339a36013301597daef46fbe57747e4d759d4508bc8dfe4d49165fbe43b6065c4",
-        //     staker: bob,
-        //     satoshiAmount: 200000000,
-        //     depositTimestamp: 1725705600,
-        //     duration: 100 days,
-        //     avs: _avs,
-        //     allocations: _allocations
-        // }));
     }
 
-    function test_createBabylonStratVaultAndRestake() external {
+    function test_createBabylonStratVault() external {
+        vm.prank(BYZANTINE_RELAYER_ADDRESS);
+        address babylonVault = vaultManager.createBabylonStratVault();
+        assertEq(address(BabylonStrategyVault(babylonVault).byzBTC()), address(byzBTC));
+    }
+
+    function test_restakeInBabylonVault() external {
+        // Create the Babylon strategy vault
+        vm.prank(BYZANTINE_RELAYER_ADDRESS);
+        address babylonVault = vaultManager.createBabylonStratVault();
+        
         // Set the btcStakingDataset when strategy vault creation is needed
         address[] memory _avs = new address[](2);
         _avs[0] = address(symbioticVaultX);
@@ -83,7 +81,7 @@ contract VaultManagerTest is Test {
         _allocations[1] = 5000;
 
         btcStakingDataset.push(BtcStakingDataset({
-            babylonVault: address(0),
+            babylonVault: babylonVault,
             btcPubKey: hex"0339a36013301597daef46fbe57747e4d759d4508bc8dfe4d49165fbe43b6065c4",
             staker: alice,
             satoshiAmount: 100000000,
@@ -95,8 +93,9 @@ contract VaultManagerTest is Test {
 
         BtcStakingDataset memory dataset = btcStakingDataset[0];
 
-        // Create the Babylon strategy vault and restake
-        address vaultAddress = vaultManager.createBabylonStratVaultAndRestake(
+        // Restake in the Babylon strategy vault
+        vm.prank(BYZANTINE_RELAYER_ADDRESS);
+        vaultManager.restakeInBabylonVault(
             dataset.babylonVault,
             dataset.btcPubKey,
             dataset.staker,
@@ -108,7 +107,7 @@ contract VaultManagerTest is Test {
         );
 
         // Check the total staked amount in the Babylon strategy vault
-        uint256 totalStaked = BabylonStrategyVault(vaultAddress).getTotalStaked();
+        uint256 totalStaked = BabylonStrategyVault(babylonVault).getTotalStaked();
         assertEq(totalStaked, dataset.satoshiAmount);
 
         // Check if the struct StakingDetail is set
@@ -118,7 +117,7 @@ contract VaultManagerTest is Test {
             uint256 depositTimestamp,
             uint256 duration,
             uint256 exitTimestamp
-        ) = BabylonStrategyVault(vaultAddress).stakingDetails(dataset.staker);
+        ) = BabylonStrategyVault(babylonVault).stakingDetails(dataset.staker);
         
         assertEq(btcPubKey, dataset.btcPubKey);
         assertEq(satoshiAmount, dataset.satoshiAmount);
