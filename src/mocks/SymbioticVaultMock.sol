@@ -12,6 +12,9 @@ contract SymbioticVaultMock {
     /// @notice Address of the collateral token which is ByzBTC
     address public byzBTC;
 
+    /// @notice Addresses of the AVS
+    address[] public avs;
+
     /// @notice Balance of the BTC staked in the vault
     uint256 public activeStake;
 
@@ -24,8 +27,9 @@ contract SymbioticVaultMock {
     // /// @notice Mapping to track the deposit timestamp of each staker
     // mapping(address => uint256) public depositTimestamps;
 
-    constructor(address _byzBTC) {
+    constructor(address _byzBTC, address[] memory _avs) {
         byzBTC = _byzBTC;
+        avs = _avs;
     }
 
     /**

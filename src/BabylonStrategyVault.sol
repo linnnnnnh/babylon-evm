@@ -9,6 +9,9 @@ contract BabylonStrategyVault {
     /// @notice Address of the ByzBTC token
     ByzBTC public byzBTC;
 
+    /// @notice Address of the Symbiotic Vault
+    SymbioticVaultMock public symbioticVault;
+
     /// @notice Address of the Vault Manager
     address public vaultManager;
 
@@ -26,9 +29,10 @@ contract BabylonStrategyVault {
     /// @notice Mapping to track the staking details of each staker ETH address
     mapping(address => StakingDetail) public stakingDetails;
 
-    constructor(address _byzBTC, address _vaultManager) {
+    constructor(address _byzBTC, address _vaultManager, address[] memory _avs) {
         byzBTC = ByzBTC(_byzBTC);
         vaultManager = _vaultManager;
+        symbioticVault = new SymbioticVaultMock(_byzBTC, _avs);
     }
 
     /**
@@ -60,12 +64,12 @@ contract BabylonStrategyVault {
      * @param _amount amount of the ByzBTC to deposit
      * @param _staker address of the staker
      */
-    function deposit(uint256 _amount, address _staker, address _avs) public onlyVaultManager{
+    function deposit(uint256 _amount, address _staker) public onlyVaultManager{
         // Ensure the BabylonStrategyVault has approved the SymbioticVAultMock contract to spend tokens
-        IERC20(byzBTC).approve(_avs, _amount);
+        IERC20(byzBTC).approve(address(symbioticVault), _amount);
 
         // Deposit the ByzBTC tokens to the Symbiotic Vault by calling the deposit function of the SymbioticVaultMock contract
-        SymbioticVaultMock(_avs).deposit(_staker, _amount);
+        symbioticVault.deposit(_staker, _amount);
 
         // Update the total staked amount of BabylonStrategyVault
         totalStaked += _amount;
