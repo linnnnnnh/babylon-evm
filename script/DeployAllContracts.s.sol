@@ -6,6 +6,7 @@ import {ByzBTC} from "../src/ByzBTC.sol";
 import {SymbioticVaultMock} from "../src/mocks/SymbioticVaultMock.sol";
 import {VaultManager} from "../src/VaultManager.sol";
 
+// forge script script/DeployAllContracts.s.sol --rpc-url $SEPOLIA_RPC_URL --private-key $PRIVATE_KEY --broadcast --etherscan-api-key $ETHERSCAN_API_KEY --verify -vvv
 contract DeployAllContracts is Script {
     address constant BYZANTINE_RELAYER_ADDRESS = 0x39ace511812E43dd318C81552Caf3C8EA4b178F2;
     address constant CATALOG_SPV_SEPOLIA_ADDR = 0x7fc47Db1bD6209Bc78807e0F7E956ec862fcCd62;
