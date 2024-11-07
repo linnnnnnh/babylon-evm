@@ -36,6 +36,11 @@ contract VaultManager {
         return idToStratVault[avsHash];
     }
 
+    function getBabylonStratVaultByAvs(address[] memory _avs) public view returns (address) {
+        bytes32 avsHash = keccak256(abi.encodePacked(_avs));
+        return idToStratVault[avsHash];
+    }
+
     /**
      * @notice Restake the ByzBTC tokens representing the staked BTC
      * @param _staker address of the staker
