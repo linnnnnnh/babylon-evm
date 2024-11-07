@@ -6,17 +6,14 @@ import "./ByzBTC.sol";
 import "./mocks/SymbioticVaultMock.sol";
 
 contract VaultManager {
-    /// @notice Address of the owner
-    address public owner;
+    /// @notice Address of the Byzantine Relayer
+    address public byzantineRelayerAddress;
     /// @notice Address of the ByzBTC token
     ByzBTC public byzBTC;
-    /// @notice Address of the Symbiotic Vault
-    SymbioticVaultMock public symbioticVault;
 
-    constructor(address initialOwner, address _byzBTC, address _symbioticVault) {
-        owner = initialOwner;
+    constructor(address _byzantineRelayerAddress, address _byzBTC) {
+        byzantineRelayerAddress = _byzantineRelayerAddress;
         byzBTC = ByzBTC(_byzBTC);
-        symbioticVault = SymbioticVaultMock(_symbioticVault);
     }
 
     /**
@@ -37,20 +34,20 @@ contract VaultManager {
         uint256 _duration,
         address[] memory _avs,
         uint256[] memory _allocations
-    ) public {
+    ) public returns (address) {
         // Ensure arrays have matching lengths
         if (_avs.length != _allocations.length) revert LengthMismatch();
         
         // Create new vault if not provided
-        address vaultAddress = _babylonVault == address(0) 
+        address babylonVaultAddress = _babylonVault == address(0) 
             ? address(new BabylonStrategyVault(address(byzBTC)))
             : _babylonVault;
         
-        // Mint the ByzBTC tokens to the vault
-        byzBTC.mint(vaultAddress, _satoshiAmount);
+        // Mint the ByzBTC tokens to the strategy Babylon vault
+        byzBTC.mint(babylonVaultAddress, _satoshiAmount);
         
         // Register staking details
-        BabylonStrategyVault(vaultAddress).registerStaking(
+        BabylonStrategyVault(babylonVaultAddress).registerStaking(
             _staker,
             _satoshiAmount,
             _depositTimestamp,
@@ -61,8 +58,10 @@ contract VaultManager {
         // Deposit the ByzBTC tokens to the Symbiotic vault
         for (uint256 i = 0; i < _avs.length; i++) {
             uint256 amount = (_satoshiAmount * _allocations[i]) / 1e4;
-            BabylonStrategyVault(vaultAddress).deposit(amount, _staker, _avs[i]);
+            BabylonStrategyVault(babylonVaultAddress).deposit(amount, _staker, _avs[i]);
         }
+
+        return babylonVaultAddress;
     }
 
     error LengthMismatch();

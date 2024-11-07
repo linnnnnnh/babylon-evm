@@ -5,25 +5,147 @@ import {Test, console} from "forge-std/Test.sol";
 import {VaultManager} from "../src/VaultManager.sol";
 import {ByzBTC} from "../src/ByzBTC.sol";
 import {SymbioticVaultMock} from "../src/mocks/SymbioticVaultMock.sol";
-import {DeployByzBabylon} from "../script/DeployByzBabylon.s.sol";
+import {BabylonStrategyVault} from "../src/BabylonStrategyVault.sol";
 import {DeployByzBTC} from "../script/DeployByzBTC.s.sol";
-import {DeploySymbiotic} from "../script/DeploySymbiotic.s.sol";
+
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ERC4626Math} from "../src/libraries/ERC4626Math.sol";
+
 
 contract VaultManagerTest is Test {
     VaultManager vaultManager;
     ByzBTC byzBTC;
+
+    /// @notice Owner of the vault manager
+    address constant OWNER = 0xaDDDe88E8C1786ab04D2640FF0F155506E283584;
+
+    /// @notice Symbiotic vaults
     SymbioticVaultMock symbioticVaultX;
     SymbioticVaultMock symbioticVaultY;
 
+    // Stakers
+    address alice = makeAddr("alice");
+    address bob = makeAddr("bob");
+
+    /// @notice Initial balance of all the node operators
+    uint256 internal constant STARTING_BALANCE = 500 ether;
+
+    /// @notice Simulate a BTC staking dataset fetch from the replayer
+    struct BtcStakingDataset {
+        address babylonVault;
+        bytes btcPubKey;
+        address staker;
+        uint256 satoshiAmount;
+        uint256 depositTimestamp;
+        uint256 duration;
+        address[] avs;
+        uint256[] allocations;
+    }
+    BtcStakingDataset[] btcStakingDataset;
+    
     function setUp() external {
+        // deploy the ByzBTC token
         DeployByzBTC deployByzBTC = new DeployByzBTC();
         byzBTC = deployByzBTC.run();
 
-        DeploySymbiotic deploySymbiotic = new DeploySymbiotic();
-        symbioticVaultX = deploySymbiotic.run();
-        symbioticVaultY = deploySymbiotic.run();
+        // deploy the Symbiotic vaults
+        symbioticVaultX = new SymbioticVaultMock(address(byzBTC));
+        symbioticVaultY = new SymbioticVaultMock(address(byzBTC));
 
-        DeployByzBabylon deployByzBabylon = new DeployByzBabylon();
-        vaultManager = deployByzBabylon.run();
+        // deploy the vault manager
+        vaultManager = new VaultManager(OWNER, address(byzBTC));
+
+        // fund the stakers
+        vm.deal(alice, STARTING_BALANCE);
+        vm.deal(bob, STARTING_BALANCE);
+
+        // // Set the btcStakingDataset when strategy vault creation is not needed
+        // btcStakingDataset.push(BtcStakingDataset({
+        //     babylonVault: address(0),
+        //     btcPubKey: hex"0339a36013301597daef46fbe57747e4d759d4508bc8dfe4d49165fbe43b6065c4",
+        //     staker: bob,
+        //     satoshiAmount: 200000000,
+        //     depositTimestamp: 1725705600,
+        //     duration: 100 days,
+        //     avs: _avs,
+        //     allocations: _allocations
+        // }));
+    }
+
+    function test_createBabylonStratVaultAndRestake() external {
+        // Set the btcStakingDataset when strategy vault creation is needed
+        address[] memory _avs = new address[](2);
+        _avs[0] = address(symbioticVaultX);
+        _avs[1] = address(symbioticVaultY);
+
+        uint256[] memory _allocations = new uint256[](2);
+        _allocations[0] = 5000;
+        _allocations[1] = 5000;
+
+        btcStakingDataset.push(BtcStakingDataset({
+            babylonVault: address(0),
+            btcPubKey: hex"0339a36013301597daef46fbe57747e4d759d4508bc8dfe4d49165fbe43b6065c4",
+            staker: alice,
+            satoshiAmount: 100000000,
+            depositTimestamp: 1725705600,
+            duration: 31536000,
+            avs: _avs,
+            allocations: _allocations
+        }));
+
+        BtcStakingDataset memory dataset = btcStakingDataset[0];
+
+        // Create the Babylon strategy vault and restake
+        address vaultAddress = vaultManager.createBabylonStratVaultAndRestake(
+            dataset.babylonVault,
+            dataset.btcPubKey,
+            dataset.staker,
+            dataset.satoshiAmount,
+            dataset.depositTimestamp,
+            dataset.duration,
+            dataset.avs,
+            dataset.allocations
+        );
+
+        // Check the total staked amount in the Babylon strategy vault
+        uint256 totalStaked = BabylonStrategyVault(vaultAddress).getTotalStaked();
+        assertEq(totalStaked, dataset.satoshiAmount);
+
+        // Check if the struct StakingDetail is set
+        (
+            bytes memory btcPubKey,
+            uint256 satoshiAmount,
+            uint256 depositTimestamp,
+            uint256 duration,
+            uint256 exitTimestamp
+        ) = BabylonStrategyVault(vaultAddress).stakingDetails(dataset.staker);
+        
+        assertEq(btcPubKey, dataset.btcPubKey);
+        assertEq(satoshiAmount, dataset.satoshiAmount);
+        assertEq(depositTimestamp, dataset.depositTimestamp);
+        assertEq(duration, dataset.duration);
+        assertEq(exitTimestamp, dataset.depositTimestamp + dataset.duration);
+
+        // Check activeStake in the Symbiotic vaults
+        uint256 amountInVaultX = (_allocations[0] * dataset.satoshiAmount) / 1e4; 
+        uint256 amountInVaultY = (_allocations[1] * dataset.satoshiAmount) / 1e4;
+        assertEq(symbioticVaultX.activeStake(), amountInVaultX);
+        assertEq(symbioticVaultY.activeStake(), amountInVaultY);
+
+        // Check activeSharesOf in the Symbiotic vaults
+        uint256 mintedSharesInX = ERC4626Math.previewDeposit(amountInVaultX, symbioticVaultX.activeShares(), symbioticVaultX.activeStake());
+        uint256 mintedSharesInY = ERC4626Math.previewDeposit(amountInVaultY, symbioticVaultY.activeShares(), symbioticVaultY.activeStake());
+        console.log("mintedSharesInX", mintedSharesInX);
+        console.log("mintedSharesInY", mintedSharesInY);
+
+        assertEq(symbioticVaultX.activeSharesOf(dataset.staker), mintedSharesInX);
+        assertEq(symbioticVaultY.activeSharesOf(dataset.staker), mintedSharesInY);
+    }
+
+    /* ===================== MODIFIERS ===================== */
+
+    modifier startAtPresentDay() {
+        vm.warp(1730995913);
+        _;
     }
  }
