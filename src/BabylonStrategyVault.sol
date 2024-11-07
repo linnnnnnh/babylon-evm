@@ -1,49 +1,60 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./ByzBTC.sol";
+import "./mocks/SymbioticVaultMock.sol";
 
-contract BabylonStrategyVault is ERC20 {
+contract BabylonStrategyVault {
+    /// @notice Address of the ByzBTC token
     ByzBTC public byzBTC;
 
-    uint256 private satoshiBalance;
-
+    /// @notice Details of the staking
     struct StakingDetail {
+        bytes btcPubKey;
         uint256 satoshiAmount;
         uint256 depositTimestamp;
         uint256 duration;
-        SpendingPath spendingPath;
+        uint256 exitTimestamp;
     }
     mapping(address => StakingDetail) public stakingDetails;
 
-    enum SpendingPath {
-        Timelock,
-        Unbonding
-    }
-
-    constructor(address _byzBTC)
-        ERC20("ByzBTC", "BBTC")
-    {
+    constructor(address _byzBTC) {
         byzBTC = ByzBTC(_byzBTC);
     }
 
-    function registerStaking(address staker, uint256 satoshiAmount, uint256 depositTimestamp, uint256 duration, SpendingPath spendingPath) public {
-        // Mint the ByzBTC tokens
-        _mintByzBTC(address(this), satoshiAmount);
-
-        // Update the staking details 
-        stakingDetails[staker] = StakingDetail(satoshiAmount, depositTimestamp, duration, spendingPath);
+    /**
+     * @notice Mint the ByzBTC tokens to the vault
+     * @param to address of the recipient
+     * @param amount amount of the ByzBTC to mint which is 1:1 to the amount of BTC staked
+     */
+    function mintByzBTC(address to, uint256 amount) public {
+        byzBTC.mint(to, amount);
     }
 
-    function deposit(uint256 _amount, address _staker) public {
-        satoshiBalance += _amount;
+    /**
+     * @notice Register the staking details
+     * @param _staker address of the staker
+     * @param _satoshiAmount amount of the BTC to stake in satoshis
+     * @param _depositTimestamp timestamp of the deposit
+     * @param _duration duration of the BTC staking
+     */
+    function registerStaking(address _staker, uint256 _satoshiAmount, uint256 _depositTimestamp, uint256 _duration, bytes memory _btcPubKey) public {
+        // Calculate the timestamp corresponding to timelock
+        uint256 exitTimestamp = _depositTimestamp + _duration;
+
+        // Update the staking details 
+        stakingDetails[_staker] = StakingDetail(_btcPubKey, _satoshiAmount, _depositTimestamp, _duration, exitTimestamp);
+    }
+
+    /**
+     * @notice Deposit the ByzBTC tokens to the Symbiotic Vault
+     * @param _amount amount of the ByzBTC to deposit
+     * @param _staker address of the staker
+     */
+    function deposit(uint256 _amount, address _staker, address _avs) public {
+        SymbioticVaultMock(_avs).deposit(_staker, _amount);
     }
 
     function withdraw(uint256 _amount, address _staker) public {}
 
-
-    function _mintByzBTC(address to, uint256 amount) internal {
-        byzBTC.mint(to, amount);
-    }
 }
