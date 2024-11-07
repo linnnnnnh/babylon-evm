@@ -28,42 +28,42 @@ contract VaultManager {
      * @param _avs addresses of the AVS that the staker has delegated to
      * @param _allocations allocations in percentrage of the ByzBTC tokens to the AVS, scaled by 1e4
      */
-    function createBabylonStratVaultAndRestake(address _babylonVault, bytes memory _btcPubKey, address _staker, uint256 _satoshiAmount, uint256 _depositTimestamp, uint256 _duration, address[] memory _avs, uint256[] memory _allocations) public {
-        if (_babylonVault == address(0)) {
-            // Create the strategy vault
-            BabylonStrategyVault vault = new BabylonStrategyVault(address(byzBTC));
-
-            // Mint the ByzBTC tokens to the vault which is the owner of the ByzBTC tokens 
-            byzBTC.mint(address(vault), _satoshiAmount);
-
-            // Register the staking details in the vault
-            BabylonStrategyVault(vault).registerStaking(_staker, _satoshiAmount, _depositTimestamp, _duration, _btcPubKey);
-
-            for (uint256 i = 0; i < _avs.length; i++) {
-                for (uint256 j = 0; j < _allocations.length; j++) {
-                    // Calculate the amount of ByzBTC to deposit to the AV
-                    uint256 amount = _satoshiAmount * _allocations[j] / 1e4;
-
-                    // Deposit the tokens to the vault
-                    BabylonStrategyVault(vault).deposit(amount, _staker, _avs[j]);
-                }
-            }
-        } else {
-            // Mint the ByzBTC tokens to the vault which is the owner of the ByzBTC tokens 
-            byzBTC.mint(address(_babylonVault), _satoshiAmount);
-
-            // Register the staking details in the vault
-            BabylonStrategyVault(_babylonVault).registerStaking(_staker, _satoshiAmount, _depositTimestamp, _duration, _btcPubKey);
-
-            for (uint256 i = 0; i < _avs.length; i++) {
-                for (uint256 j = 0; j < _allocations.length; j++) {
-                    // Calculate the amount of ByzBTC to deposit to the AV
-                    uint256 amount = _satoshiAmount * _allocations[j] / 1e4;
-
-                    // Deposit the tokens to the vault
-                    BabylonStrategyVault(_babylonVault).deposit(amount, _staker, _avs[j]);
-                }
-            }
+    function createBabylonStratVaultAndRestake(
+        address _babylonVault,
+        bytes memory _btcPubKey,
+        address _staker,
+        uint256 _satoshiAmount,
+        uint256 _depositTimestamp,
+        uint256 _duration,
+        address[] memory _avs,
+        uint256[] memory _allocations
+    ) public {
+        // Ensure arrays have matching lengths
+        if (_avs.length != _allocations.length) revert LengthMismatch();
+        
+        // Create new vault if not provided
+        address vaultAddress = _babylonVault == address(0) 
+            ? address(new BabylonStrategyVault(address(byzBTC)))
+            : _babylonVault;
+        
+        // Mint the ByzBTC tokens to the vault
+        byzBTC.mint(vaultAddress, _satoshiAmount);
+        
+        // Register staking details
+        BabylonStrategyVault(vaultAddress).registerStaking(
+            _staker,
+            _satoshiAmount,
+            _depositTimestamp,
+            _duration,
+            _btcPubKey
+        );
+        
+        // Deposit the ByzBTC tokens to the Symbiotic vault
+        for (uint256 i = 0; i < _avs.length; i++) {
+            uint256 amount = (_satoshiAmount * _allocations[i]) / 1e4;
+            BabylonStrategyVault(vaultAddress).deposit(amount, _staker, _avs[i]);
         }
     }
+
+    error LengthMismatch();
 }
