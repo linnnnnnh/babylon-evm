@@ -61,8 +61,8 @@ contract VaultManagerTest is Test {
     //         alice,
     //         80000,
     //         1725705600,
-    //         31536000,
-    //         strat2
+    //         strat2,
+    //         false
     //     );
 
     //     // Check the total staked amount in the Babylon strategy vault
